@@ -1,5 +1,5 @@
-/* 	
-	
+/*
+
 	version 2.6
 	04.04.17
 
@@ -21,7 +21,7 @@
 	adress 2 - encoder2 counter
 	adress 3 - encoder3 counter
 	adress 4 - encoder4 counter
-	adress 5 - 
+	adress 5 -
 	adress 6 - Zero
 	adress 7 - port in
 
@@ -30,7 +30,7 @@
 	adress 10 - out2 shim
 	adress 11 - out3 shim
 	adress 12 - out4 shim
-	adress 13 - 
+	adress 13 -
 	adress 14 - out_ pin(16)
 	adress 15 - index
 	reg 28 -reserved
@@ -72,7 +72,7 @@ typedef struct {
 	hal_bit_t *digital_in[32];    /* ptrs for digital input pins 0 - 31 */
 	hal_bit_t *digital_in_n[32];
   	hal_bit_t *digital_out[32];    /* ptrs for digital output pins 0 - 31 */
-	hal_bit_t *enable_dr; 
+	hal_bit_t *enable_dr;
 	hal_bit_t *index_en[5];
 
 	hal_float_t *enccounts[5];
@@ -82,7 +82,7 @@ typedef struct {
 	hal_float_t *outscale[5];
 	hal_float_t *dcontrol[5];
 
-	
+
 	hal_float_t *sdscale[Max_sdchanel];
 	hal_float_t *digital_out_step[Max_sdchanel];
 	hal_float_t *sd_counts[Max_sdchanel];
@@ -100,7 +100,7 @@ static to_pci_t *device_data;
 
 /* other globals */
 static int comp_id;		/* component ID */
-static int num_ports;		/* number of ports configured */ 
+static int num_ports;		/* number of ports configured */
 
 int WD_start =0;
 
@@ -178,8 +178,8 @@ int rtapi_app_main(void)
 
     /* STEP 1: initialise the driver */
     comp_id = hal_init(driver_NAME);
-	if (comp_id < 0) { 
-		rtapi_print_msg(RTAPI_MSG_ERR,"to_pci: ERROR: hal_init() failed\n");   
+	if (comp_id < 0) {
+		rtapi_print_msg(RTAPI_MSG_ERR,"to_pci: ERROR: hal_init() failed\n");
     	return -1;
     }
 
@@ -188,26 +188,26 @@ int rtapi_app_main(void)
     if (device_data == 0) {
 		rtapi_print_msg(RTAPI_MSG_ERR,"to_pci: ERROR: hal_malloc() failed\n");
 		r = -1;
-		goto fail0;    
+		goto fail0;
     }
 
 
-////////////PCI INIT...      
-   
+////////////PCI INIT...
+
     to_io = pci_get_device(VENDORID_dev, num_dev, to_io);
-    
+
     if (NULL == to_io) {
-		rtapi_print_msg(RTAPI_MSG_ERR,"to_io == NULL\n");  
+		rtapi_print_msg(RTAPI_MSG_ERR,"to_io == NULL\n");
 		hal_exit(comp_id);
 		return -1;
     }
-    
+
     device_data->io_base = pci_resource_start(to_io, 0);
 
     device_data->len = pci_resource_len(to_io, 0);
 
-    rtapi_print_msg(RTAPI_MSG_INFO,"to_pci: io_base: %X \n", device_data->io_base); 
-   
+    rtapi_print_msg(RTAPI_MSG_INFO,"to_pci: io_base: %X \n", device_data->io_base);
+
     device_data->mem_base = ioremap_nocache( device_data->io_base,device_data->len);
 
 	printk(KERN_ALERT "to_pci: io_base: %X, mem_base: %p\n", device_data->io_base, device_data->mem_base);
@@ -217,10 +217,10 @@ int rtapi_app_main(void)
                 r = -ENODEV;
                 goto fail0;
 	}
-	
+
 //    writel(0x6000000A,(device_data->mem_base)+(reg_WD*4));
 
-	if(ustreg)	
+	if(ustreg)
 		writel(0x6001000F,(device_data->mem_base)+(reg_SWch*4));  //regim step/dir
 	else
 		writel(0x60000000,(device_data->mem_base)+(reg_SWch*4));  //regim PWM
@@ -299,17 +299,17 @@ int rtapi_app_main(void)
 		if (retval < 0) {
 			rtapi_print_msg(RTAPI_MSG_ERR,"to_pci: ERROR: port %d var export failed with err=%i\n", n + 1,retval);
 			r = -1;
-			goto fail1; 
-		}  
+			goto fail1;
+		}
 			/* encoder_velocity */
 		retval = hal_pin_float_newf(HAL_IN, &(device_data-> encvel[i]), comp_id, "to_pci.%d.feedback.enc_vel%d", 1, i);
 		if (retval < 0) {
 			rtapi_print_msg(RTAPI_MSG_ERR,"to_pci: ERROR:  err enc_velocity=%i\n", retval);
 			r = -1;
 			goto fail1;
-		}   
+		}
 	}
-	
+
 //////////////////////////////
 /////////////////////////////
 /////////////////////////////
@@ -405,7 +405,7 @@ return r;
 }
 
 void rtapi_app_exit(void)
-{	
+{
 //	writel(0x60000000,(device_data->mem_base)+(reg_WD*4));
 	iounmap((void*)device_data->mem_base);
 	hal_exit(comp_id);
@@ -429,7 +429,7 @@ int ABS_SUB(__s32 lt1, __s32 lt2)
 
 	if(lt3 < 5)
 		return 0;
-	else	
+	else
 		return 1;
 }
 
@@ -442,57 +442,62 @@ int ABS_SUB(__s32 lt1, __s32 lt2)
 __s32 DDcontr(void *farg,__u8 exr)
 {
 
+	// Step Dir Command format
+	//
+	// 31 ---30 ----- 29 28 --- 27 - 24 ----------- 23 - 17 --- 16 - 0
+	// dir - enable - rez ----- imp_len_counter --- rez ------- pause_counter
+	// impulse_length = imp_len_counter * IMP_SAMPLE ns
+	// pause_length = pause_counter *  MIN_SAMPLE ns + imp_len_counter * IMP_SAMPLE ns
+	//
+
+	#define ONE_SEC 1000000000 //ns in one second
+	#define IMP_SAMPLE 500 //ns
+	#define MIN_SAMPLE 20 //ns
+	#define MAX_PAUSE_COUNTER 131071 //17bit
+	#define PID_MAX_OUTPUT 1000
+
 	to_pci_t *data_sd;
 
-	int smax;
-	__u8 ttz;
-	__u32 Len_imp,temp1,pkor,pause_t;
+	//__u8 smax; // now not in use
+	__u8 dir,enable,imp_len_counter;
+	__u32 pause_counter;
 	float V_cmd;
+	int max_freq;
 
 	data_sd = farg;
-
 	V_cmd = *(data_sd-> digital_out_step[exr]);
-	smax = *data_sd->sd_max[exr];
-	Len_imp = *data_sd->L_imp[exr];
-	
-	//Направление	
-	pkor = 0;		//установка dir
-	if(V_cmd<0) 
-	{
-    		pkor=1;	      //установка dir
-    		V_cmd = -V_cmd; //модуль скорости
-  	}
- 	
-//normalization
-  V_cmd = (1-(V_cmd/10));
-  if(V_cmd < 0)
-      V_cmd = 0;
+	//smax = *data_sd->sd_max[exr]; //now not in use
+	imp_len_counter = *data_sd->L_imp[exr];
 
-	pause_t = (int) 131071*V_cmd;
-	ttz = 0x01;
-	if(pause_t == 131071)
-    ttz = 0;
+	if(imp_len_counter > 15)
+		imp_len_counter = 15;
 
-  	pkor <<= 1;
-	pkor = pkor | ttz;
-/*	
-//Limit frequency	
-// smax - in KHz
-  temp1 = (int)((1000/smax)-1)*50;
-  if(temp1<0)
-    temp1 = 0;
-    
-  if(pause_t<temp1)
-    pause_t = temp1;
-*/
-	temp1 = pause_t & 0x0001ffff;
-	pkor <<= 30;
-	pkor = pkor | temp1;
+	// Zero V_cmd - output disabled
+	if(V_cmd == 0)
+		return imp_len_counter << 24;
+		//return 0 ???
 
-	temp1 = 0x02000000; // L_imp 1uS
-	pkor = pkor | temp1;
+	if(V_cmd < 0){
+	  V_cmd = -V_cmd;
+	  dir = 1;
+	}else{
+	  dir = 0;
+	}
 
-	return pkor;
+	if(V_cmd > PID_MAX_OUTPUT)
+		V_cmd = PID_MAX_OUTPUT;
+
+	max_freq = ONE_SEC/(IMP_SAMPLE*2*imp_len_counter); // Hz
+
+	pause_counter = (ONE_SEC/(max_freq*(V_cmd/PID_MAX_OUTPUT))-IMP_SAMPLE*2*imp_len_counter)/MIN_SAMPLE;
+	if(pause_counter > MAX_PAUSE_COUNTER){
+	  pause_counter = MAX_PAUSE_COUNTER;
+	  enable = 0;
+	}else{
+	  enable = 1;
+	}
+
+	return dir << 31 | enable << 30 | imp_len_counter << 24 | pause_counter;
 }
 /**************************************************************
 * REALTIME PORT WRITE FUNCTION                                *
@@ -500,12 +505,12 @@ __s32 DDcontr(void *farg,__u8 exr)
 
 void update_port(void *arg, long period){
 	to_pci_t *port;
-	
+
 
 	__u32 tmp,mask,tmask,tanmask;
 	__s32 ikor;
 	int pin,k;
-	
+
 	int flagok;
 	__s32 temp1,temp2;
 
@@ -517,12 +522,12 @@ void update_port(void *arg, long period){
 
 	writel(0x6000000A,(device_data->mem_base)+(reg_WD*4));
 
-//////////////////////////////////////////////////////////////////////////////	
+//////////////////////////////////////////////////////////////////////////////
 ////////////////////ALL INPUTS///////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-// read digital inputs 	    
-	tmp = readl((port->mem_base)+(reg_in*4)); 
+// read digital inputs
+	tmp = readl((port->mem_base)+(reg_in*4));
       	mask = 0x00000001;
 	for (pin=0 ; pin < 32 ; pin++) {
 		*(port->digital_in[pin]) = (tmp & mask) ? 1:0 ;
@@ -550,7 +555,7 @@ void update_port(void *arg, long period){
 		{
 			temp2=(__s32)readl((port->mem_base)+(renci[k]*4));
 			flagok = ABS_SUB(temp1,temp2);
-			temp1 = temp2;			
+			temp1 = temp2;
 		}
 		*port->enccounts[k] = temp1/(*port->encscale[k]);
 
@@ -573,16 +578,16 @@ void update_port(void *arg, long period){
 		{
 			temp2=(__s32)readl((port->mem_base)+(rstdr[k]*4));
 			flagok = ABS_SUB(temp1,temp2);
-			temp1 = temp2;			
+			temp1 = temp2;
 		}
 		*port->sd_counts[k] = temp1/(*port->sdscale[k]);
 	}
 
-//////////////////////////////////////////////////////////////////////////////	
+//////////////////////////////////////////////////////////////////////////////
 ////////////////////ALL OUTPUTS///////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-// write index_enable outputs 
+// write index_enable outputs
      	tmp = 0x0;
      	mask = 0x01;
      	for (pin=0; pin < 5; pin++) {
@@ -592,10 +597,10 @@ void update_port(void *arg, long period){
 			mask <<= 1;
      	}
 
-		tmp |= tmask;	
-		writel(tmp,(port->mem_base)+(reg_index*4)); 
+		tmp |= tmask;
+		writel(tmp,(port->mem_base)+(reg_index*4));
 
-// write digital outputs 
+// write digital outputs
      	tmp = 0x0;
      	mask = 0x01;
      	for (pin=0; pin < 16; pin++) {
@@ -605,7 +610,7 @@ void update_port(void *arg, long period){
 			mask <<= 1;
      	}
 		tmp |= tmask;
-		writel(tmp,(port->mem_base)+(reg_out*4)); 
+		writel(tmp,(port->mem_base)+(reg_out*4));
 /*
 		tmp = 0x0;
      	mask = 0x01;
@@ -616,7 +621,7 @@ void update_port(void *arg, long period){
 			mask <<= 1;
      	}
 		tmp |= tmask;
-		writel(tmp,(port->mem_base)+(reg_out2*4)); 
+		writel(tmp,(port->mem_base)+(reg_out2*4));
 */
 
 
@@ -631,18 +636,18 @@ void update_port(void *arg, long period){
      	}
 
 	tmp |= tmask;
-	writel(tmp,(port->mem_base)+(control_reg*4)); 
+	writel(tmp,(port->mem_base)+(control_reg*4));
 
 // out to drive
 
 	for ( k=0; k<=4;k++) {
-		ikor = (*port->outscale[k])*((*(port-> dcontrol[k]))/10)*0xffff;	
+		ikor = (*port->outscale[k])*((*(port-> dcontrol[k]))/10)*0xffff;
 		ikor |= tmask;
 		ikor &= tanmask;
 		writel( ikor,(port->mem_base)+(rdctr[k]*4));
-	} 
+	}
 
-// Step dir 
+// Step dir
 
 	for ( k=0; k<=(Max_sdchanel-1);k++) {
 		ikor = DDcontr(port,k);

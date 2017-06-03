@@ -1,0 +1,63 @@
+loadrt trivkins
+loadrt [EMCMOT]EMCMOT servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[TRAJ]AXES
+
+loadrt to_pci
+loadrt pid names=pid.x
+
+
+
+# ################################################
+# THREADS
+# ################################################
+
+addf to_pci.1.update		          servo-thread
+addf motion-command-handler                servo-thread
+addf motion-controller                     servo-thread
+addf pid.x.do-pid-calcs 		servo-thread       
+
+
+# ######################################################
+# Axis-of-motion Specific Configs (not the GUI)
+# ######################################################
+#   -------PID--------
+setp   pid.x.Pgain     [AXIS_0]P
+setp   pid.x.Igain     [AXIS_0]I
+setp   pid.x.Dgain     [AXIS_0]D
+setp   pid.x.bias      [AXIS_0]BIAS
+setp   pid.x.FF0       [AXIS_0]FF0
+setp   pid.x.FF1       [AXIS_0]FF1
+setp   pid.x.FF2       [AXIS_0]FF2
+setp   pid.x.deadband  [AXIS_0]DEADBAND
+setp   pid.x.maxoutput [AXIS_0]MAX_OUTPUT
+
+net x-enable       => pid.x.enable
+net x-output       pid.x.output
+net x-pos-cmd      => pid.x.command
+net x-pos-fb       => pid.x.feedback
+
+# --------feed back--------------
+#setp  to_pci.1.feedback.enc_scale0 [AXIS_0]ENCODER_SCALE
+
+net x-pos-fb       <=  to_pci.1.step_dir.count0
+net x-pos-fb       =>  axis.0.motor-pos-fb
+
+# ------PWM Generator signals/setup----------------------
+net x-enable     axis.0.amp-enable-out
+net x-enable => to_pci.1.enable_drive
+net x-pos-cmd    axis.0.motor-pos-cmd
+
+#---------------Step gen signals---------------------------------
+
+setp  to_pci.1.step_dir.scale0 [AXIS_0]SD_FB_SCALE
+setp  to_pci.1.step_dir.L_imp0 [AXIS_0]SD_Len_impuls
+
+net x-output  to_pci.1.step_dir.outstep0
+
+##########################################
+
+net estop-out <= iocontrol.0.user-enable-out
+net estop-out => iocontrol.0.emc-enable-in
+
+
+
+
